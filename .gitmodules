@@ -1,0 +1,3 @@
+[submodule "3rdparty/cupy"]
+	path = 3rdparty/cupy
+	url = https://github.com/cupy/cupy.git
