@@ -261,6 +261,8 @@ Build from Source
 
 ```bash
 #!bin/bash
+git clone --recursive https://github.com/RezkyKam50/warpcv.git
+cd warpcv
 ./configure.sh
 ```
 
