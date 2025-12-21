@@ -153,7 +153,7 @@ converted_image = cupy_cvt_bgr2rgb_float(
     resized_cp, 
     block_size=(32, 16, 2)
 )
-``` 
+```
 
 ### Compatibility
 
@@ -206,6 +206,7 @@ By default, WarpCV sets compiler flag to `'-O1', '-v'` and sets the compiler to 
 WarpCV passes `WCV_COMPILE_OPTIONS` for NVCC flags and `WCV_BACKEND` for chosing between `'nvcc'` or `'nvrtc'` compilers which are passed to `cupy.RawKernel(..., options, backend)`
 
 via current terminal session:
+
 ```bash
 #!bin/bash
 export WCV_COMPILE_OPTIONS='["-O3", "--use_fast_math"]' # This will pass as ('-O3', '--use_fast_math') to cupy.RawKernel(..., options)
@@ -224,7 +225,9 @@ resized_image = wcvs.cupy_resize_3c(
     block_size=(32, 16, 2)
 )
 ```
+
 via `os.environ`:
+
 ```python
 import os
 import json
@@ -252,11 +255,14 @@ resized_image = wcvs.cupy_resize_3c(
 
 ## Installation (Linux)
 
-via PyPi
+via PyPI
+
 ```bash
 pip install -e .
 ```
+
 Build from Source
+
 ```bash
 #!bin/bash
 ./configure.sh
