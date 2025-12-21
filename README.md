@@ -1,8 +1,4 @@
-# WarpCV
-
-A collection of highly optimized Python Computer Vision CUDA Kernels for ultra-low latency pipelines based on **CuPy**.
-
-## Why and When to Use WarpCV?
+### Why and When to Use WarpCV?
 
 WarpCV simplifies preprocessing and postprocessing in CV inference pipelines by minimizing host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy).
 
@@ -157,7 +153,7 @@ converted_image = cupy_cvt_bgr2rgb_float(
 
 ### Compatibility
 
-The collection is based on `CuPy.RawKernel`, making each `warpcv.collection.*` function fully compatible with:
+The collection is based on `cupy.RawKernel`, making each `warpcv.collection.*` function fully compatible with:
 
 - `cupy.cuda.Stream` for asynchronous execution
 - `cupy.cuda.Graph` for optimized kernel replay
