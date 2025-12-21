@@ -1,6 +1,6 @@
 ### Why and When to Use WarpCV?
 
-WarpCV simplifies preprocessing and postprocessing in CV inference pipelines by minimizing host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy).
+WarpCV is respectable to CuPy ecosystem by simplifying preprocessing and postprocessing in CV inference pipelines which minimizes host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy).
 
 The problem lies in context switching between CUDA runtimes, which introduces significant latency and overhead.
 
