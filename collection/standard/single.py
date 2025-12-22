@@ -7,7 +7,6 @@ from collection.utils import options, backend
 # https://news.ycombinator.com/item?id=45458948
 # the trick is mainly for fp8 computation but we'll try it here
 
-
 bilinear_kernel_2c = cp.RawKernel(r'''
 extern "C" __global__
 void cutlass_resize_bilinear(
@@ -16,7 +15,6 @@ void cutlass_resize_bilinear(
     int in_h, int in_w,
     int out_h, int out_w
 ){
-    
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     
@@ -51,20 +49,23 @@ void cutlass_resize_bilinear(
 }
 ''', 'cutlass_resize_bilinear', options=options, backend=backend)
 
-def cupy_resize_2c(depth_cp, out_h, out_w, block_size):
+def cupy_resize_2c(img_cp, out_h, out_w, dtype, block_size):
     '''
     Comparable to cv2.resize with INTER_LINEAR for 2 channels depth map.
     Args:
-        depth_cp: cupy array of shape (H, W)
+        img_cp: cupy array of shape (H, W)
         out_h: desired output height
         out_w: desired output width
+        dtype: data type for the output array
         block_size: tuple of (block_x, block_y) for CUDA kernel launch
     Returns:
         Resized depth map as cupy array of shape (out_h, out_w)
     '''
-    in_h, in_w = depth_cp.shape
-    depth_cp_f = depth_cp.astype(cp.float32, copy=False)
-    out_cp = cp.empty((out_h, out_w), dtype=cp.float32)
+    in_h, in_w = img_cp.shape
+    assert len(img_cp.shape) == 2, "Only single channel images supported"
+
+    img_cp = cp.ascontiguousarray(img_cp).astype(dtype, copy=False)
+    out_cp = cp.empty((out_h, out_w), dtype=dtype)
      
     grid = (
         (out_w + block_size[0] - 1) // block_size[0],
@@ -74,11 +75,10 @@ def cupy_resize_2c(depth_cp, out_h, out_w, block_size):
     bilinear_kernel_2c(
         grid,
         block_size,
-        (depth_cp_f, out_cp, in_h, in_w, out_h, out_w)
+        (img_cp, out_cp, in_h, in_w, out_h, out_w)
     )
      
     return out_cp
-
 
 bilinear_kernel_3c = cp.RawKernel(r'''
 extern "C" __global__
@@ -104,7 +104,6 @@ void cutlass_resize_bilinear_3c(
     src_x = fminf(fmaxf(src_x, 0.0f), (float)(in_w - 1.0001f));
     src_y = fminf(fmaxf(src_y, 0.0f), (float)(in_h - 1.0001f));
 
-    
     const int x0 = __float2int_rd(src_x);
     const int y0 = __float2int_rd(src_y);
     const int x1 = min(x0 + 1, in_w - 1);
@@ -133,13 +132,14 @@ void cutlass_resize_bilinear_3c(
 }
 ''', 'cutlass_resize_bilinear_3c', options=options, backend=backend)
 
-def cupy_resize_3c(img_cp, out_w, out_h, block_size):
+def cupy_resize_3c(img_cp, out_h, out_w, dtype, block_size):
     '''
     Comparable to cv2.resize with INTER_LINEAR for 3 channels image.
     Args:
         img_cp: cupy array of shape (H, W, 3)
         out_h: desired output height
         out_w: desired output width
+        dtype: data type for the output array
         block_size: tuple of (block_x, block_y) for CUDA kernel launch
     Returns:
         Resized image as cupy array of shape (out_h, out_w, 3)
@@ -147,9 +147,8 @@ def cupy_resize_3c(img_cp, out_w, out_h, block_size):
     h, w, c = img_cp.shape
     assert c == 3, "Only 3-channel images supported"
 
-    img_cp = cp.ascontiguousarray(img_cp)
-    img_f = img_cp.astype(cp.float32, copy=True)
-    out = cp.empty((out_h, out_w, 3), dtype=cp.float32)
+    img_cp = cp.ascontiguousarray(img_cp).astype(dtype, copy=False)
+    out = cp.empty((out_h, out_w, 3), dtype=dtype)
     
     grid = (
         (out_w + block_size[0] - 1) // block_size[0],
@@ -161,7 +160,7 @@ def cupy_resize_3c(img_cp, out_w, out_h, block_size):
         grid,
         block_size,
         (
-            img_f,
+            img_cp,
             out,
             h, w,
             out_h, out_w,
@@ -170,7 +169,6 @@ def cupy_resize_3c(img_cp, out_w, out_h, block_size):
     )
     
     return out
-
 
 bgr2rgb_float_kernel = cp.RawKernel(r'''
 extern "C" __global__
@@ -184,8 +182,7 @@ void cutlass_bgr2rgb_float(
     int c = blockIdx.z;
     
     if (x >= w || y >= h) return;
-
-    
+                                    
     int idx = (y * w + x) * 3 + c;
     
     // Map BGR to RGB: channel 0<->2, channel 1 stays
@@ -196,19 +193,21 @@ void cutlass_bgr2rgb_float(
 }
 ''', 'cutlass_bgr2rgb_float', options=options, backend=backend)
 
-def cupy_cvt_bgr2rgb_float(img_cp, block_size):
+def cupy_cvt_bgr2rgb_float(img_cp, dtype, block_size):
     '''
     Convert BGR image to RGB format for float32 images, comparable to cv2.cvtColor(img, cv2.COLOR_BGR2RGB).
     Args:
         img_cp: cupy array of shape (H, W, 3) in BGR format
+        dtype: data type for the output array
         block_size: tuple of (block_x, block_y) for CUDA kernel launch
     Returns:
         RGB image as cupy array of shape (H, W, 3)
     '''
     h, w, c = img_cp.shape
     assert c == 3, "Only 3-channel images supported"
-    img_cp = cp.ascontiguousarray(img_cp)
-    out = cp.empty_like(img_cp)
+
+    img_cp = cp.ascontiguousarray(img_cp).astype(dtype, copy=False)
+    out = cp.empty_like(img_cp, dtype=dtype)
     
     grid = (
         (w + block_size[0] - 1) // block_size[0],

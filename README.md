@@ -4,9 +4,9 @@
 
 ### Why and When to Use WarpCV?
 
-WarpCV is respectable to CuPy ecosystem by simplifying preprocessing and postprocessing in CV inference pipelines which minimizes host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy).
+WarpCV is respectable to CuPy ecosystem by simplifying preprocessing and postprocessing from *micro to millisecond optimization* in CV inference pipelines which minimizes host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy).
 
-The problem lies in context switching between CUDA runtimes, which introduces significant latency and overhead.
+The problem lies in context switching between CUDA runtimes that may or may not coexist with host offloading, which introduces significant latency and overhead.
 
 ### Common Pipelines:
 
@@ -127,6 +127,7 @@ result = wcvs.fused_resize_normalize_transpose_3c(
     out_w=640,
     mean=mean,
     std=std,
+    dtype=cp.float32,
     block_size=(32, 16, 2)
 )
 # Only 1 kernel launch for 3 operations!
@@ -145,12 +146,14 @@ resized_image = cupy_resize_3c(
     cupy_image,
     out_h=640,
     out_w=640,
+    dtype=cp.float32,
     block_size=(32, 16, 2)
 )
 
 # Comparable to cv2.cuda.cvtColor(numpy_image, cv2.COLOR_BGR2RGB)
 converted_image = cupy_cvt_bgr2rgb_float(
-    resized_cp, 
+    resized_image, 
+    dtype=cp.float32,
     block_size=(32, 16, 2)
 )
 ```
@@ -191,6 +194,7 @@ for _ in range(0, 2):
                 out_w=640,
                 mean=mean,
                 std=std,
+                dtype=cp.float32,
                 block_size=(32, 16, 2)
             )
             graph = cupy_stream.end_capture()
@@ -255,9 +259,10 @@ resized_image = wcvs.cupy_resize_3c(
 
 ## Installation (Linux)
 
-via PyPI
+via PyPI Virtual Environment
 
 ```bash
+git clone --recursive https://github.com/RezkyKam50/warpcv.git
 pip install -e .
 ```
 
@@ -270,15 +275,26 @@ cd warpcv
 ./configure.sh
 ```
 
-## Benefits
+#### For profiling, see the [NVIDIA Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html).
 
-- ✅ **No host-device transfers** - stays on GPU
-- ✅ **Single CUDA runtime** - no context switching
-- ✅ **Fused kernels** - multiple ops in one launch
-- ✅ **Stream & graph compatible** - maximum throughput
-- ✅ **Minimal latency** - optimized for real-time inference
-- ✅ **Cleaner code** - improves readability and practicality
+#### WarpCV doesn't implement a built-in [NVTX](https://github.com/NVIDIA/NVTX.git) marking on each kernel function.
 
 ---
 
-Suitable for: Real-time video processing, robotics, autonomous systems, and any application where every microsecond counts.
+## License
+
+MIT License - See LICENSE file
+
+---
+
+## References
+
+```bibtex
+@inproceedings{cupy_learningsys2017,
+  author       = "Okuta, Ryosuke and Unno, Yuya and Nishino, Daisuke and Hido, Shohei and Loomis, Crissman",
+  title        = "CuPy: A NumPy-Compatible Library for NVIDIA GPU Calculations",
+  booktitle    = "Proceedings of Workshop on Machine Learning Systems (LearningSys) in The Thirty-first Annual Conference on Neural Information Processing Systems (NIPS)",
+  year         = "2017",
+  url          = "http://learningsys.org/nips17/assets/papers/paper_16.pdf"
+}
+```

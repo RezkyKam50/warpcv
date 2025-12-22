@@ -7,7 +7,6 @@ from collection.utils import options, backend
 # https://news.ycombinator.com/item?id=45458948
 # the trick is mainly for fp8 computation but we'll try it here
  
-
 fused_bgr2rgb_resize_kernel = cp.RawKernel(r'''
 extern "C" __global__
 void cutlass_fused_bgr2rgb_resize_3c(
@@ -74,7 +73,7 @@ void cutlass_fused_bgr2rgb_resize_3c(
 }
 ''', 'cutlass_fused_bgr2rgb_resize_3c', options=options, backend=backend)
 
-def fused_bgr2rgb_resize_3c(img_cp, out_h, out_w, block_size):
+def fused_bgr2rgb_resize_3c(img_cp, out_h, out_w, dtype, block_size):
     '''
     Fused BGR to RGB conversion and resizing for 3 channels image.
     Comparable to cv2.cvtColor + cv2.resize with INTER_LINEAR.
@@ -82,19 +81,17 @@ def fused_bgr2rgb_resize_3c(img_cp, out_h, out_w, block_size):
         img_cp: cupy array of shape (H, W, 3) in BGR format
         out_h: desired output height
         out_w: desired output width
+        dtype: data type for the output array
         block_size: tuple of (block_x, block_y, block_z) for CUDA kernel launch
     Returns:
-        Resized RGB image as cupy array of shape (out_h, out_w,
+        Resized RGB image as cupy array of shape (out_h, out_w, 3)
     '''
-
     h, w, c = img_cp.shape
-
     assert c == 3, "Only 3-channel images supported"
-    
-    img_f = img_cp.astype(cp.float32, copy=False)
-    out = cp.empty((out_h, out_w, 3), dtype=cp.float32) 
-     
 
+    img_cp = cp.ascontiguousarray(img_cp).astype(dtype, copy=False)
+    out = cp.empty((out_h, out_w, 3), dtype=dtype) 
+     
     grid = (
         (out_w + block_size[0] - 1) // block_size[0],
         (out_h + block_size[1] - 1) // block_size[1],
@@ -104,11 +101,10 @@ def fused_bgr2rgb_resize_3c(img_cp, out_h, out_w, block_size):
     fused_bgr2rgb_resize_kernel(
         grid,
         block_size,
-        (img_f, out, h, w, out_h, out_w)
+        (img_cp, out, h, w, out_h, out_w)
     )
     return out
 
- 
 fused_resize_normalize_transpose_kernel = cp.RawKernel(r'''
 extern "C" __global__
 void cutlass_fused_resize_normalize_transpose_3c(
@@ -170,7 +166,7 @@ void cutlass_fused_resize_normalize_transpose_3c(
 }
 ''', 'cutlass_fused_resize_normalize_transpose_3c', options=options, backend=backend)
 
-def fused_resize_normalize_transpose_3c(img_cp, out_h, out_w, mean, std, block_size):
+def fused_resize_normalize_transpose_3c(img_cp, out_h, out_w, mean, std, dtype, block_size):
     '''
     Fused resize + normalize + HWC→CHW transpose for 3-channel images.
     Comparable to cv2.resize + ((img - mean) / std)  + cupy.transpose
@@ -181,6 +177,7 @@ def fused_resize_normalize_transpose_3c(img_cp, out_h, out_w, mean, std, block_s
         out_w: desired output width
         mean: tuple/list of 3 CuPy floats for normalization mean per channel
         std: tuple/list of 3 CuPy floats for normalization std per channel
+        dtype: data type for the output array
         block_size: tuple of (block_x, block_y, block_z) for CUDA kernel launch
     
     Returns:
@@ -189,9 +186,8 @@ def fused_resize_normalize_transpose_3c(img_cp, out_h, out_w, mean, std, block_s
     h, w, c = img_cp.shape
     assert c == 3, "Only 3-channel images supported"
      
-    img_f = img_cp.astype(cp.float32, copy=False)
-     
-    out = cp.empty((3, out_h, out_w), dtype=cp.float32)
+    img_cp = cp.ascontiguousarray(img_cp).astype(dtype, copy=False)
+    out = cp.empty((3, out_h, out_w), dtype=dtype)
     
     grid = (
         (out_w + block_size[0] - 1) // block_size[0],
@@ -202,7 +198,7 @@ def fused_resize_normalize_transpose_3c(img_cp, out_h, out_w, mean, std, block_s
     fused_resize_normalize_transpose_kernel(
         grid,
         block_size,
-        (img_f, out, h, w, out_h, out_w, mean, std)
+        (img_cp, out, h, w, out_h, out_w, mean, std)
     )
     
     return out
