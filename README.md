@@ -53,10 +53,12 @@ np_array = np.array(cpu_array)
 gpu_mat2 = cv2.cuda_GpuMat()
 gpu_mat2.upload(np_array)
 ```
-<div style="display: flex; align-items: center; gap: 30px;">
+
+<div style="display: flex; align-items: flex-start; gap: 30px;">
   <img src="media/nvdev0.gif" alt="Alt text" width="300">
   <span><strong>Latency introduced:</strong> Host-device memory transfers + NumPy conversion overhead + CUDA runtime context switching</span>
 </div>
+
 
 #### [See Reference](https://developer.nvidia.com/blog/machine-learning-frameworks-interoperability-part-2-data-loading-and-data-transfer-bottlenecks/)
 ---
@@ -116,10 +118,12 @@ normalized = resized.astype(cp.float32) / 255.0
 # Operation 3: Transpose (kernel launch #3)
 transposed = cp.transpose(normalized, (2, 0, 1))
 ```
-<div style="display: flex; align-items: center; gap: 30px;">
+<div style="display: flex; align-items: flex-start; gap: 30px;">
   <img src="media/kernelLaunchpng" alt="Alt text" width="300">
   <span><strong>Latency introduced:</strong> 3 separate kernel launches + GPU must wait for each kernel to complete where memory is read/written 3 times instead of once</span>
 </div>
+
+
 
 #### [See Reference](https://forums.developer.nvidia.com/t/kernel-switch-latency-successive-kernels-switch-latency/309504/2)
 ---
