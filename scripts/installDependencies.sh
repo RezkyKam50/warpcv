@@ -1,1 +1,1 @@
-uv pip install loguru 
+uv pip install setuptools Cython wheel loguru

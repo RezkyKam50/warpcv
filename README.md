@@ -2,13 +2,31 @@
 <img src="media/warpcv.png" alt="Alt text" width="1200">
 </p>
 
+---
+
+# Comparison to OpenCV, OpenCV-CUDA, CuPy: Image pre/post proccessing
+
+<table>
+  <tr>
+    <td><img src="media/bench/avglat.png" alt="Average Latency" width="600"></td>
+    <td><img src="media/bench/bgrrnt.png" alt="BGR Runtime" width="600"></td>
+  </tr>
+  <tr>
+    <td><img src="media/bench/intavg.png" alt="Integer Average" width="600"></td>
+    <td><img src="media/bench/intres.png" alt="Integer Result" width="600"></td>
+  </tr>
+</table>
+
+Tested on: RTX4070 Mobile (Ada Lovelace). With FP32 operations, WarpCV is **7.56x faster** than OpenCV-CUDA and **1.81x faster** than CuPy with noticeably more stable deviation for broad ranges of image resolution, accompanied by 3.28x (CuPy) and 1.48x (OpenCV-CUDA) less memory allocation from intermediate operations. WarpCV benefits both from latency and memory allocation where CuPy and OpenCV-CUDA has their own tradeoff.
+
+---
 ### Why and When to Use WarpCV?
 
-WarpCV is respectable to CuPy ecosystem by simplifying preprocessing and postprocessing from *micro to millisecond optimization* in CV inference pipelines which minimizes host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy).
+WarpCV is respectable to CuPy ecosystem by simplifying pre/post-processing for *micro to millisecond optimization* in CV inference pipelines which minimizes host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential production pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy, cuCIM).
 
-The problem lies in context switching between CUDA runtimes that may or may not coexist with host offloading, which introduces significant latency and overhead.
+The problem lies in context switching between CUDA runtimes that may or may not coexist with host offloading, which introduces significant latency and overhead that are common in TensorRT pipeline. It roots down to classical physics itself specific in the PCIe lane.
 
-### Common Pipelines:
+### Common Example:
 
 ### Example 1: OpenCV CUDA ↔ NumPy (Host-Device Transfers)
 
@@ -35,9 +53,12 @@ np_array = np.array(cpu_array)
 gpu_mat2 = cv2.cuda_GpuMat()
 gpu_mat2.upload(np_array)
 ```
+<div style="display: flex; align-items: center; gap: 30px;">
+  <img src="media/nvdev0.gif" alt="Alt text" width="300">
+  <span><strong>Latency introduced:</strong> Host-device memory transfers + NumPy conversion overhead + CUDA runtime context switching</span>
+</div>
 
-**Latency introduced:** Host-device memory transfers + NumPy conversion overhead + CUDA runtime context switching
-
+#### [See Reference](https://developer.nvidia.com/blog/machine-learning-frameworks-interoperability-part-2-data-loading-and-data-transfer-bottlenecks/)
 ---
 
 ### Example 2: CuPy ↔ OpenCV CUDA (Memory Pointer Copying)
@@ -51,7 +72,7 @@ import cv2
 # Start with CuPy array
 cupy_array = cp.array(image, dtype=cp.uint8)
 
-# Need to use cv2.cuda function - requires conversion
+# Need to use cv2.cuda function - requires conversion related to Example 1
 # Method 1: Via CPU (very slow)
 cpu_temp = cp.asnumpy(cupy_array)  # GPU -> CPU
 gpu_mat = cv2.cuda_GpuMat()
@@ -64,7 +85,7 @@ gpu_mat = cv2.cuda_GpuMat(
     cv2.CV_8UC3,
     cupy_array.data.ptr
 )
-# This creates a copy of the pointer, not zero-copy
+# This creates a copy of the pointer value, not zero-copy
 
 # Process
 result_mat = cv2.cuda.resize(gpu_mat, (640, 480))
@@ -72,8 +93,7 @@ result_mat = cv2.cuda.resize(gpu_mat, (640, 480))
 # Convert back from cv2.cuda to NumPy and to CuPy ( more copying + 2x transfers! )
 result_cupy = cp.asarray(result_mat.download())
 ```
-
-**Latency introduced:** GPU memory pointer copying + potential data layout differences + runtime compatibility issues
+**Latency introduced:** GPU memory pointer copying via `cudaMemcpyDeviceToDevice` + potential data layout differences (strides ) and runtime compatibility clashes for newer releases
 
 ---
 
@@ -96,23 +116,21 @@ normalized = resized.astype(cp.float32) / 255.0
 # Operation 3: Transpose (kernel launch #3)
 transposed = cp.transpose(normalized, (2, 0, 1))
 ```
+<div style="display: flex; align-items: center; gap: 30px;">
+  <img src="media/kernelLaunchpng" alt="Alt text" width="300">
+  <span><strong>Latency introduced:</strong> 3 separate kernel launches + GPU must wait for each kernel to complete where memory is read/written 3 times instead of once</span>
+</div>
 
-**Latency introduced:**
-
-- 3 separate kernel launches
-- GPU must wait for each kernel to complete
-- No kernel fusion optimization
-- Memory is read/written 3 times instead of once
-
+#### [See Reference](https://forums.developer.nvidia.com/t/kernel-switch-latency-successive-kernels-switch-latency/309504/2)
 ---
 
 ## WarpCV Solution
 
-WarpCV provides **fused CUDA kernels** that combine multiple operations into a single kernel launch, staying entirely within the CuPy ecosystem:
+WarpCV provides **fused CUDA kernels** that combines multiple operation into a single kernel launch, staying entirely within the CuPy ecosystem with simplified abstraction and fine-grained control over block sizes, aiming for future proof compatibility for incoming GPU architectures:
 
 ```python
 import cupy as cp
-import warpcv.collection.standard.fused as wcvs
+import warpcv.collection.standard.fused as wcsf
  
 cupy_image = cp.array(image, dtype=cp.uint8)
 
@@ -121,7 +139,7 @@ std = cp.array([58.395, 57.12, 57.375], dtype=cp.float32)
 
 
 # Single fused kernel: resize + normalize + transpose
-result = wcvs.fused_resize_normalize_transpose_3c(
+result = wcsf.fused_resize_normalize_transpose_3c(
     cupy_image,
     out_h=640,
     out_w=640,
@@ -137,12 +155,12 @@ WarpCV also provides **standalone (single) CUDA kernels** comparable to `cv2.cud
 
 ```python
 import cupy as cp
-import warpcv.collection.standard.single as wcvs
+import warpcv.collection.standard.single as wcss
 
 cupy_image = cp.array(image, dtype=cp.uint8)
 
 # Comparable to: cv2.cuda.resize
-resized_image = cupy_resize_3c(
+resized_image = wcss.cupy_resize_3c(
     cupy_image,
     out_h=640,
     out_w=640,
@@ -151,7 +169,7 @@ resized_image = cupy_resize_3c(
 )
 
 # Comparable to cv2.cuda.cvtColor(numpy_image, cv2.COLOR_BGR2RGB)
-converted_image = cupy_cvt_bgr2rgb_float(
+converted_image = wcss.cupy_cvt_bgr2rgb_float(
     resized_image, 
     dtype=cp.float32,
     block_size=(32, 16, 2)
@@ -169,11 +187,11 @@ The collection is based on `cupy.RawKernel`, making each `warpcv.collection.*` f
 
 ```python
 import cupy as cp
-import pycuda as cuda
+import pycuda.driver as cuda
 import pycuda.autoinit
 from cupy.cuda import Device
 Device(0).use() # this avoids conflict with PyCUDA context
-import warpcv.collection.standard.fused as wcvs
+import warpcv.collection.standard.fused as wcsf
 
 cupy_image = cp.array(image, dtype=cp.uint8)
 mean = cp.array([123.675, 116.28, 103.53], dtype=cp.float32)
@@ -188,7 +206,7 @@ for _ in range(0, 2):
     if graph is None:
         with cupy_stream:
             cupy_stream.begin_capture()
-            result = wcvs.fused_resize_normalize_transpose_3c(
+            result = wcsf.fused_resize_normalize_transpose_3c(
                 cupy_image,
                 out_h=640,
                 out_w=640,
@@ -206,8 +224,8 @@ for _ in range(0, 2):
 
 ### Environment Variables
 
-By default, WarpCV sets compiler flag to `'-O1', '-v'` and sets the compiler to `'nvcc'`, however we can change this via environment variable that will apply to all imported kernels *after* setting the environment.
-WarpCV passes `WCV_COMPILE_OPTIONS` for NVCC flags and `WCV_BACKEND` for chosing between `'nvcc'` or `'nvrtc'` compilers which are passed to `cupy.RawKernel(..., options, backend)`
+By default, WarpCV sets compiler flag to `'-O2', '-v'` and sets the compiler to `'nvcc'`, however we can change this via environment variable that will apply to all imported kernels *after* setting the environment.
+WarpCV passes `WCV_COMPILE_OPTIONS` for NVCC flags and `WCV_BACKEND` for chosing between `'nvcc'` or `'nvrtc' (CuPy's default)` compilers which are passed to `cupy.RawKernel(..., options, backend)`
 
 via current terminal session:
 
@@ -219,10 +237,10 @@ export WCV_BACKEND='nvcc' # CuPy by default uses 'nvrtc' for JIT compilation, th
 
 ```python
 import cupy as cp
-import warpcv.collection.standard.single as wcvs
+import warpcv.collection.standard.single as wcss
 cupy_image = cp.array(image, dtype=cp.uint8)
 # This kernel will now compile with 'nvcc' compiler and "-O3", "--use_fast_math" flags
-resized_image = wcvs.cupy_resize_3c(
+resized_image = wcss.cupy_resize_3c(
     cupy_image,
     out_h=640,
     out_w=640,
@@ -242,10 +260,10 @@ os.environ['WCV_COMPILE_OPTIONS'] = json.dumps(["-O3", "--use_fast_math"])
 os.environ['WCV_BACKEND'] = 'nvcc'
 
 # Import warpcv will initialize SetOptions(*GetWCVEnv()) under collections/utils.py which gets context from the environment variables.
-import warpcv.collection.standard.single as wcvs
+import warpcv.collection.standard.single as wcss
  
 cupy_image = cp.array(image, dtype=cp.uint8)
-resized_image = wcvs.cupy_resize_3c(
+resized_image = wcss.cupy_resize_3c(
     cupy_image,
     out_h=640,
     out_w=640,

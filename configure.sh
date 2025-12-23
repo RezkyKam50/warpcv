@@ -1,3 +1,5 @@
+#!/bin/bash
+
 CUDA_V=V13.0.88
 
 echo "checking uv installation ..."

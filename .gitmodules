@@ -1,3 +1,9 @@
 [submodule "3rdparty/cupy"]
 	path = 3rdparty/cupy
 	url = https://github.com/cupy/cupy.git
+[submodule "3rdparty/opencv"]
+	path = 3rdparty/opencv
+	url = https://github.com/opencv/opencv.git
+[submodule "3rdparty/opencv_contrib"]
+	path = 3rdparty/opencv_contrib
+	url = https://github.com/opencv/opencv_contrib.git

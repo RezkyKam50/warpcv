@@ -10,8 +10,8 @@ def SetOptions(options, backend) -> Tuple[Union[List[str], Tuple[str, ...], Dict
     if backend is not None:
         backend = backend
     if options is None and backend is None:
-        options = ('-O1', '-v') 
-        backend = 'nvrtc'
+        options = ('-O2', '-v') 
+        backend = 'nvcc'
     logger.info(f"WCV: Using compiler options: {options} with backend: {backend}")
 
     return options, backend
@@ -23,6 +23,8 @@ def GetWCVEnv():
     if options_str:
         try:
             options = json.loads(options_str)
+            if isinstance(options, list):
+                options = tuple(options)
         except json.JSONDecodeError:
             logger.info(f"WCV: Invalid JSON in WCV_COMPILE_OPTIONS, setting to None")
             options = None
@@ -44,5 +46,3 @@ def GetWCVEnv():
     return options, backend
 
 options, backend = SetOptions(*GetWCVEnv())
-
-

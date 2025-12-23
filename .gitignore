@@ -1,6 +1,9 @@
 .vscode/
 __pycache__/
 *.pyc
-.venv/
+.venv
 *.egg-info/
 build/
+build_opencv/
+dist/
+*.txt

@@ -1,5 +1,5 @@
 import cupy as cp
-from collection.utils import options, backend
+from ...utils import options, backend
 
 # -> adding "cutlass" to function name triggers several optimization 
 # Refs:
