@@ -568,8 +568,8 @@ def main():
     plot_avg_latency_barplot(all_results_bgr2rgb, all_results_rnt, "Avg. Latency")
      
     if CUDA_AVAILABLE:
-        plot_vram_usage(all_vram_bgr2rgb, all_vram_rnt, "Intermediate (Indirect/ops allocation) VRAM Usage Over Resolutions")
-        plot_avg_vram_barplot(all_vram_bgr2rgb, all_vram_rnt, "Intermediate (Indirect/ops allocation) Avg. VRAM")
+        plot_vram_usage(all_vram_bgr2rgb, all_vram_rnt, "Intermediate (peak cumulative allocation) VRAM Usage Over Resolutions")
+        plot_avg_vram_barplot(all_vram_bgr2rgb, all_vram_rnt, "Intermediate (per-iteration allocation) Avg. VRAM")
 
 if __name__ == "__main__":
     main()
