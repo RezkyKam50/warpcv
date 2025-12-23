@@ -121,7 +121,7 @@ transposed = cp.transpose(normalized, (2, 0, 1))
 ```
 
 <div style="display: flex; align-items: flex-start; gap: 30px;">
-  <img src="media/kernelLaunchpng" alt="Alt text" width="300">
+  <img src="media/kernelLaunch.png" alt="Alt text" width="300">
   <span><strong>Latency introduced:</strong> 3 separate kernel launches + GPU must wait for each kernel to complete where memory is read/written 3 times instead of once</span>
 </div>
 

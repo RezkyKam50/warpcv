@@ -20,6 +20,9 @@ INPUT_SIZES = [(480, 640), (720, 1280), (1080, 1920), (2160, 3840)]
 OUTPUT_SIZES = [(224, 224), (256, 256), (512, 512), (1024, 1024), (2048, 2048), (4096, 4096)]
 BLOCK_SIZE = (32, 32, 1)
 BLOCK_SIZE_4K = (32, 32, 1)
+CP_FLOAT_TYPE = cp.float32
+NP_FLOAT_TYPE = np.float32
+
 WARMUP_ITERS = 5
 BENCH_ITERS = 20
 CUDA_AVAILABLE = cv2.cuda.getCudaEnabledDeviceCount() > 0 if hasattr(cv2, 'cuda') else False
@@ -100,18 +103,18 @@ def bgr2rgb_cupy(img, img_cp, out_h, out_w):
     return rgb[y_grid, x_grid]
 
 def bgr2rgb_custom(img, img_cp, out_h, out_w, block_size=BLOCK_SIZE):
-    return fused_bgr2rgb_resize_3c(img_cp, out_h, out_w, cp.float32, block_size)
+    return fused_bgr2rgb_resize_3c(img_cp, out_h, out_w, CP_FLOAT_TYPE, block_size)
 
 def rnt_cpu(img, img_cp, out_h, out_w):
-    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32) * 255
-    std = np.array([0.229, 0.224, 0.225], dtype=np.float32) * 255
+    mean = np.array([0.485, 0.456, 0.406], dtype=NP_FLOAT_TYPE) * 255
+    std = np.array([0.229, 0.224, 0.225], dtype=NP_FLOAT_TYPE) * 255
     resized = cv2.resize(img, (out_w, out_h))
     normalized = (resized - mean) / std
     return np.transpose(normalized, (2, 0, 1))
 
 def rnt_cuda(img, img_cp, out_h, out_w):
-    mean = cp.array([0.485, 0.456, 0.406], dtype=cp.float32) * 255
-    std = cp.array([0.229, 0.224, 0.225], dtype=cp.float32) * 255
+    mean = cp.array([0.485, 0.456, 0.406], dtype=CP_FLOAT_TYPE) * 255
+    std = cp.array([0.229, 0.224, 0.225], dtype=CP_FLOAT_TYPE) * 255
     gpu = cv2.cuda_GpuMat()
     gpu.upload(img)
     gpu = cv2.cuda.resize(gpu, (out_w, out_h))
@@ -120,8 +123,8 @@ def rnt_cuda(img, img_cp, out_h, out_w):
     return cp.transpose(normalized, (2, 0, 1))
 
 def rnt_cupy(img, img_cp, out_h, out_w):
-    mean = cp.array([0.485, 0.456, 0.406], dtype=cp.float32) * 255
-    std = cp.array([0.229, 0.224, 0.225], dtype=cp.float32) * 255
+    mean = cp.array([0.485, 0.456, 0.406], dtype=CP_FLOAT_TYPE) * 255
+    std = cp.array([0.229, 0.224, 0.225], dtype=CP_FLOAT_TYPE) * 255
     y_idx = cp.linspace(0, img_cp.shape[0]-1, out_h).astype(cp.int32)
     x_idx = cp.linspace(0, img_cp.shape[1]-1, out_w).astype(cp.int32)
     y_grid, x_grid = cp.meshgrid(y_idx, x_idx, indexing='ij')
@@ -130,9 +133,9 @@ def rnt_cupy(img, img_cp, out_h, out_w):
     return cp.transpose(normalized, (2, 0, 1))
 
 def rnt_custom(img, img_cp, out_h, out_w, block_size=BLOCK_SIZE):
-    mean = cp.array([0.485, 0.456, 0.406], dtype=cp.float32) * 255
-    std = cp.array([0.229, 0.224, 0.225], dtype=cp.float32) * 255
-    return fused_resize_normalize_transpose_3c(img_cp, out_h, out_w, mean, std, cp.float32, block_size)
+    mean = cp.array([0.485, 0.456, 0.406], dtype=CP_FLOAT_TYPE) * 255
+    std = cp.array([0.229, 0.224, 0.225], dtype=CP_FLOAT_TYPE) * 255
+    return fused_resize_normalize_transpose_3c(img_cp, out_h, out_w, mean, std, CP_FLOAT_TYPE, block_size)
  
 def plot(all_results_bgr2rgb, all_results_rnt, all_vram_bgr2rgb, all_vram_rnt, title):
     methods = list(all_results_bgr2rgb[0][2].keys())
@@ -553,7 +556,7 @@ def main():
 
     for in_h, in_w in INPUT_SIZES:
         for out_h, out_w in OUTPUT_SIZES:            
-            img = np.random.rand(in_h, in_w, 3).astype(np.float32) * 255
+            img = np.random.rand(in_h, in_w, 3).astype(NP_FLOAT_TYPE) * 255
  
             res_bgr2rgb, vram_bgr2rgb = benchmark(img, (out_h, out_w), bgr2rgb_pipelines)
             all_results_bgr2rgb.append(((in_h, in_w), (out_h, out_w), res_bgr2rgb, vram_bgr2rgb))
