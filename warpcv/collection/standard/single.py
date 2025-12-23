@@ -7,7 +7,7 @@ from ...utils import options, backend
 # https://news.ycombinator.com/item?id=45458948
 # the trick is mainly for fp8 computation but we'll try it here
 
-bilinear_kernel_2c = cp.RawKernel(r'''
+bilinear_kernel_1c = cp.RawKernel(r'''
 extern "C" __global__
 void cutlass_resize_bilinear(
     const float* __restrict__ src,
@@ -49,9 +49,9 @@ void cutlass_resize_bilinear(
 }
 ''', 'cutlass_resize_bilinear', options=options, backend=backend)
 
-def cupy_resize_2c(img_cp, out_h, out_w, dtype, block_size):
+def cupy_resize_1c(img_cp, out_h, out_w, dtype, block_size):
     '''
-    Comparable to cv2.resize with INTER_LINEAR for 2 channels depth map.
+    Comparable to cv2.resize with INTER_LINEAR for 1 channel image.
     Args:
         img_cp: cupy array of shape (H, W)
         out_h: desired output height
@@ -72,7 +72,7 @@ def cupy_resize_2c(img_cp, out_h, out_w, dtype, block_size):
         (out_h + block_size[1] - 1) // block_size[1]
     )
      
-    bilinear_kernel_2c(
+    bilinear_kernel_1c(
         grid,
         block_size,
         (img_cp, out_cp, in_h, in_w, out_h, out_w)
