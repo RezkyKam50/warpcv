@@ -22,7 +22,7 @@ Tested on: RTX4070 Mobile (Ada Lovelace). With FP32 operations, WarpCV is **7.56
 ---
 ### Why and When to Use WarpCV?
 
-WarpCV is respectable to CuPy ecosystem by simplifying pre/post-processing for *micro to millisecond optimization* in CV inference pipelines which minimizes host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential production pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy, cuCIM).
+WarpCV is respectable to CuPy ecosystem by simplifying pre/post-processing for *micro to millisecond optimization* in CV inference pipelines which minimizes host-device memory transfers and eliminating inefficiencies that occur when multiple CUDA runtimes are mixed in a sequential production pipeline (e.g., CuPy, cv2.cuda, numba.cuda, NumPy, cupyx.scipy).
 
 The problem lies in context switching between CUDA runtimes that may or may not coexist with host offloading, which introduces significant latency and overhead that are common in TensorRT pipeline. It roots down to classical physics itself specific in the PCIe lane.
 
@@ -284,7 +284,9 @@ resized_image = wcss.cupy_resize_3c(
 via PyPI Virtual Environment
 
 ```bash
+#!bin/bash
 git clone --recursive https://github.com/RezkyKam50/warpcv.git
+cd warpcv
 pip install -e .
 ```
 
